@@ -291,7 +291,7 @@ function display_update(display::Display,action::Action,ws)
                     #ImPlot.SetNextPlotLimitsY(0.0, y_org_max, ImGuiCond_Always,1)
                     #ImPlot.SetNextPlotLimitsY(y_res_min, y_res_max, ImGuiCond_Always,2)
                     #if ImPlot.BeginPlot("##line", "x", "y", CImGui.ImVec2(-1,-1); flags = ImPlot.ImPlotFlags_YAxis2 )
-                    if ImPlot.BeginPlot("##line1", C_NULL, "org", CImGui.ImVec2(-1,cur_img_height/2-20); 
+                    if ImPlot.BeginPlot("##line1", "", "org", CImGui.ImVec2(-1,cur_img_height/2-20); 
                             x_flags = ImPlot.LibCImPlot.ImPlotAxisFlags(ImPlotAxisFlags_Default & ~ImPlotAxisFlags_TickLabels) )
                         ImPlot.PlotLine(display.x_values,display.y_org)
                         #ImPlot.SetPlotYAxis(2)
