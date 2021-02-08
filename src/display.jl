@@ -15,6 +15,7 @@ using CImGui.OpenGLBackend
 using ImPlot
 import CImGui.LibCImGui: ImGuiCond_Always
 
+using Formatting
 import DataStructures.CircularBuffer
 
 #using .World
@@ -285,24 +286,37 @@ function display_update(display::Display,action::Action,ws)
                     x_max_index=1000
                     y_org_max = maximum(display.y_org)
                     y_res_min = Float64(minimum(display.y_res))
-                    y_res_min -= 0.1*y_res_min
+                    y_res_min -= 0.01*y_res_min
                     y_res_max = Float64(maximum(display.y_res))
-                    y_res_max += 0.1*y_res_max
+                    y_res_max += 0.01*y_res_max
                     
+                    nlabels=5
+                    fmt = "%10.0f"
+                    fmtrfunc = generate_formatter( fmt )
+
+                    yticks=collect(range(0,y_org_max,length=nlabels))
+                    #ylabels=join.(setindex!.(collect.(fmtrfunc.(yticks)),'.',1))
+                    #ylabels=replace.(fmtrfunc.(yticks)," " => "_")
+                    ylabels=fmtrfunc.(yticks)
+                    ylabels[1]=replace(ylabels[1]," " => "_")
+
+                    ImPlot.SetNextPlotTicksY(yticks,nlabels;labels=ylabels,show_default=false,y_axis=0)
                     ImPlot.SetNextPlotLimits(display.x_values[1], display.x_values[1000], 0.0, y_org_max, ImGuiCond_Always)
-                    #ImPlot.SetNextPlotLimitsY(0.0, y_org_max, ImGuiCond_Always,1)
-                    #ImPlot.SetNextPlotLimitsY(y_res_min, y_res_max, ImGuiCond_Always,2)
-                    #if ImPlot.BeginPlot("##line", "x", "y", CImGui.ImVec2(-1,-1); flags = ImPlot.ImPlotFlags_YAxis2 )
                     if ImPlot.BeginPlot("##line1", C_NULL, "org", CImGui.ImVec2(-1,cur_img_height/2-20); 
                         x_flags = ImPlotAxisFlags_NoTickLabels
                         )
                         ImPlot.PlotLine(display.x_values,display.y_org)
-                        #ImPlot.SetPlotYAxis(2)
-                        #ImPlot.PlotLine(display.x_values,display.y_res)
                         ImPlot.EndPlot()
                     end
+
+                    yticks=collect(range(y_res_min,y_res_max,length=nlabels))
+                    #ylabels=join.(setindex!.(collect.(fmtrfunc.(yticks)),'.',1))
+                    #ylabels=replace.(fmtrfunc.(yticks)," " => "_")
+                    ylabels=fmtrfunc.(yticks)
+                    ylabels[1]=replace(ylabels[1]," " => "_")
+                    
+                    ImPlot.SetNextPlotTicksY(yticks,nlabels;labels=ylabels,show_default=false,y_axis=0)
                     ImPlot.SetNextPlotLimits(display.x_values[1], display.x_values[1000], y_res_min, y_res_max, ImGuiCond_Always)
-                    #ImPlot.SetNextPlotTicksY([y_res_min,y_res_min+(y_res_max-y_res_min)/2.0,y_res_max], 3)
                     if ImPlot.BeginPlot("##line2", "steps", "res", CImGui.ImVec2(-1,cur_img_height/2-20) )
                         ImPlot.PlotLine(display.x_values,display.y_res)
                         ImPlot.EndPlot()
