@@ -64,6 +64,7 @@ mutable struct Display
     isOpen::Bool
     window::GLFW.Window
     ctx::Ptr{ImGuiContext}
+    ctxp::Ptr{ImPlot.LibCImPlot.ImPlotContext}
     ranges::Ptr{ImVector_ImWchar}
     builder::Ptr{ImFontGlyphRangesBuilder}
     config::Ptr{ImFontConfig}
@@ -92,6 +93,7 @@ function display_initialize()
 
     # setup Dear ImGui context
     ctx = CImGui.CreateContext()
+    ctxp = ImPlot.CreateContext()
 
     # setup Dear ImGui style
     CImGui.StyleColorsClassic()
@@ -139,7 +141,7 @@ function display_initialize()
         push!(x_values,i)
     end
 
-    return Display(true,window,ctx,ranges,builder,font_config,img_width,img_height,image_id,world_image,image_cache,
+    return Display(true,window,ctx,ctxp,ranges,builder,font_config,img_width,img_height,image_id,world_image,image_cache,
         x_values,y_org,y_res
     )
 end
@@ -283,16 +285,17 @@ function display_update(display::Display,action::Action,ws)
                     x_max_index=1000
                     y_org_max = maximum(display.y_org)
                     y_res_min = Float64(minimum(display.y_res))
-                    y_res_min -= 0.01*y_res_min
+                    y_res_min -= 0.1*y_res_min
                     y_res_max = Float64(maximum(display.y_res))
-                    y_res_max += 0.01*y_res_max
+                    y_res_max += 0.1*y_res_max
                     
                     ImPlot.SetNextPlotLimits(display.x_values[1], display.x_values[1000], 0.0, y_org_max, ImGuiCond_Always)
                     #ImPlot.SetNextPlotLimitsY(0.0, y_org_max, ImGuiCond_Always,1)
                     #ImPlot.SetNextPlotLimitsY(y_res_min, y_res_max, ImGuiCond_Always,2)
                     #if ImPlot.BeginPlot("##line", "x", "y", CImGui.ImVec2(-1,-1); flags = ImPlot.ImPlotFlags_YAxis2 )
-                    if ImPlot.BeginPlot("##line1", "", "org", CImGui.ImVec2(-1,cur_img_height/2-20); 
-                            x_flags = ImPlot.LibCImPlot.ImPlotAxisFlags(ImPlotAxisFlags_Default & ~ImPlotAxisFlags_TickLabels) )
+                    if ImPlot.BeginPlot("##line1", C_NULL, "org", CImGui.ImVec2(-1,cur_img_height/2-20); 
+                        x_flags = ImPlotAxisFlags_NoTickLabels
+                        )
                         ImPlot.PlotLine(display.x_values,display.y_org)
                         #ImPlot.SetPlotYAxis(2)
                         #ImPlot.PlotLine(display.x_values,display.y_res)
@@ -518,6 +521,7 @@ function display_close(display::Display)
         ImFontGlyphRangesBuilder_destroy(display.builder)
         ImFontConfig_destroy(display.config)
         CImGui.DestroyContext(display.ctx)
+        ImPlot.DestroyContext(display.ctxp)
         GLFW.DestroyWindow(display.window)
     end
     return display
