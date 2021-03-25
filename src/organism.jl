@@ -242,7 +242,7 @@ let next_id::Int64 = 1
                 current_position
             )
         end
-        function Organism(org::Organism)
+        function Organism(org)
             id=next_id
             next_id+=1
             new(id,
