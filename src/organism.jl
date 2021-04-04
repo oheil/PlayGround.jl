@@ -9,6 +9,12 @@ include("expression.jl")
 #using .Coordinatesm
 
 let next_id::Int64 = 1
+    function randomize!(params::Array{Float64,1})
+        delta=0.1  #10%
+        for index in eachindex(params)
+            params[index] = params[index] * rand( (1-delta):0.01:(1+delta))
+        end
+    end
     mutable struct Organism
         id::Int64
         energy::Int64
@@ -242,17 +248,29 @@ let next_id::Int64 = 1
                 current_position
             )
         end
-        function Organism(org)
+        function Organism(org, randomize = false)
             id=next_id
             next_id+=1
+            trigger_split_expression_parameter=deepcopy(org.trigger_split_expression_parameter)
+            housekeeping_expression_parameter=deepcopy(org.housekeeping_expression_parameter)
+            energy_expression_parameter=deepcopy(org.energy_expression_parameter)
+            ϕ_expression_parameter=deepcopy(org.ϕ_expression_parameter)
+            θ_expression_parameter=deepcopy(org.θ_expression_parameter)
+            if randomize
+                randomize!(trigger_split_expression_parameter)
+                randomize!(housekeeping_expression_parameter)
+                randomize!(energy_expression_parameter)
+                randomize!(ϕ_expression_parameter)
+                randomize!(θ_expression_parameter)
+            end
             new(id,
                 org.energy,org.birth_time,
                 org.is_sibling,org.generation,
-                org.trigger_split_expression,deepcopy(org.trigger_split_expression_parameter),org.trigger_split_function,
-                org.housekeeping_expression,deepcopy(org.housekeeping_expression_parameter),org.housekeeping_function,
-                org.energy_expression,deepcopy(org.energy_expression_parameter),org.energy_function,
-                org.ϕ_expression,deepcopy(org.ϕ_expression_parameter),org.ϕ_function,
-                org.θ_expression,deepcopy(org.θ_expression_parameter),org.θ_function,
+                org.trigger_split_expression,trigger_split_expression_parameter,org.trigger_split_function,
+                org.housekeeping_expression,housekeeping_expression_parameter,org.housekeeping_function,
+                org.energy_expression,energy_expression_parameter,org.energy_function,
+                org.ϕ_expression,ϕ_expression_parameter,org.ϕ_function,
+                org.θ_expression,θ_expression_parameter,org.θ_function,
                 org.current_position
             )
         end

@@ -288,7 +288,7 @@ function split_organism!(org::Organism,ws::State,derived_param::DerivedParameter
         end
         org.energy=new_energy1
         cur_time=get(ws,currentTime)
-        sibling=Organism(org)
+        sibling=Organism(org, true)
         sibling.energy=new_energy2
         sibling.is_sibling=true
         sibling.generation=org.generation+1
