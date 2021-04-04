@@ -76,7 +76,7 @@ struct State
         organisms=Array{Organism,1}(undef,0)
         cur_max_ancestor=Array{Organism,1}(undef,1)
         helper=StateHelpers()
-        new(display, wp,floats, ints, resources, organisms, cur_max_ancestor, helper)
+        new(display, wp, floats, ints, resources, organisms, cur_max_ancestor, helper)
     end
 end
 

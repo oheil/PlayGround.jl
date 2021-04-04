@@ -137,7 +137,7 @@ function display_initialize()
     y_res=CircularBuffer{Int}(1000)
     x_values=CircularBuffer{Int}(1000)
     fill!(y_org,0)
-    fill!(y_res,0)
+    #fill!(y_res,0)
     for i in 1:1000
         push!(x_values,i)
     end
@@ -276,6 +276,9 @@ function display_update(display::Display,action::Action,ws)
                 size=CImGui.GetWindowSize()
                 cur_img_width=floor(Int,size.x)
                 cur_img_height=floor(Int,size.y)
+                if length(display.y_res) == 0
+                    fill!(display.y_res,length(ws.resources))
+                end
                 if !action.stop
                     push!(display.y_org,length(ws.organisms))
                     push!(display.y_res,length(ws.resources))
