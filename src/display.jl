@@ -77,11 +77,21 @@ mutable struct Display
     x_values::CircularBuffer{Int}
     y_org::CircularBuffer{Int}
     y_res::CircularBuffer{Int}
+    filename_buffer::Vector{UInt8}
+    showLoad::Bool
 end
 
 mutable struct Action
     stop::Bool
     exit::Bool
+    save::Bool
+    load::Bool
+    function Action()
+        new(false,false,false,false)
+    end
+    function Action(stop::Bool)
+        new(stop,false,false,false)
+    end
 end
 
 function display_initialize()
@@ -141,9 +151,12 @@ function display_initialize()
     for i in 1:1000
         push!(x_values,i)
     end
-
+    default_filename="ws.serialize"
+    filename_buffer=resize!(UInt8.(collect(default_filename)),100)
+    filename_buffer[length(default_filename)+1]=UInt8('\0')
     return Display(true,window,ctx,ctxp,ranges,builder,font_config,img_width,img_height,image_id,world_image,image_cache,
-        x_values,y_org,y_res
+        x_values,y_org,y_res,
+        filename_buffer,true
     )
 end
 
@@ -214,7 +227,16 @@ function display_update(display::Display,action::Action,ws)
                 else
                     CImGui.Button("Run") && (action.stop = false)
                 end
+                CImGui.SameLine()
                 CImGui.Button("Exit") && (action.exit = true)
+                CImGui.Button("Save") && (action.save = true)
+                if display.showLoad
+                    CImGui.SameLine()
+                    CImGui.Button("Load") && (action.load = true)
+                end
+
+                CImGui.SameLine()
+                CImGui.InputText("",display.filename_buffer,length(display.filename_buffer)-1)
                 CImGui.End()
 
                 CImGui.Begin("Print")

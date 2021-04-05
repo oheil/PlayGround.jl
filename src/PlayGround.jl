@@ -1,9 +1,9 @@
 
 module PlayGround
 
-
 using Dates
 using Random
+using Serialization
 
 include("world.jl")
 using .World
@@ -12,12 +12,12 @@ using .World
 global display
 
 #function run(display,ws::World.State,wdp::World.DerivedParameters,action=Action(false))
-function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action(false,false))
+function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action())
     time=World.get_time(ws)
     realtime=Dates.now()
     elapsed_realtime=0
     res_count=length(ws.resources)
-    while ! action.stop && ! action.exit && ws.display.isOpen && World.get_step(ws) < World.get_maxsteps(ws)
+    while ! action.stop && ! action.exit && ws.display[1].isOpen && World.get_step(ws) < World.get_maxsteps(ws)
         #println(step," - ",time)
         time=World.do_timestep!(ws)
         World.do_step!(ws)
@@ -62,7 +62,8 @@ function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action(fa
             realtime=Dates.now()
             elapsed_realtime=0
             #display=display_update(display,ws,action)
-            global display=World.display_update(ws.display,action,ws)
+            ws.display[1].showLoad=false
+            global display=World.display_update(ws.display[1],action,ws)
         #end
 
         World.expunge_organisms(ws)
@@ -72,6 +73,12 @@ function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action(fa
         #if length(ws.organisms)==0
         #    action.stop=true
         #end
+        if action.save
+            eos=findfirst(c->c==UInt8('\0'),display.filename_buffer)
+            fn=join(Char.(display.filename_buffer[1:(eos-1)]))
+            save_current_world_state(ws,fn)
+            action.save=false
+        end
     end
     action.stop=true
     ws
@@ -79,26 +86,42 @@ end
 
 function run(max_steps::Int=typemax(Int),ws=nothing,wdp=nothing)
     #global display=display_initialize()
-    wp=World.Parameters()
+    wp=Vector{World.Parameters}(undef,1)
+    wp[1]=World.Parameters()
     wdp=World.DerivedParameters(wp)
-    action=World.Action(true,false)
+    action=World.Action(true)
     if isnothing(ws)
         ws=World.State(wp)
         #display=World.display_update(ws.display,action,ws)
-        World.init!(wp,wdp,ws)
+        World.init!(wp[1],wdp,ws)
+    else
+        ws.display[1]=World.display_initialize()
     end
-    global display=ws.display
+    global display=ws.display[1]
     try
         World.set_maxsteps!(ws,max_steps)
-        while ws.display.isOpen && ! action.exit
+        while ws.display[1].isOpen && ! action.exit
             sleep(0.007)
             #display=display_update(display,ws,action)
-            global display=World.display_update(ws.display,action,ws)
+            ws.display[1].showLoad=true
+            global display=World.display_update(ws.display[1],action,ws)
             #World.expunge_organisms(ws)
             if ! action.stop
                 World.set_step!(ws,0)
                 #ws=run(display,ws,wdp,action)
                 ws=run(ws,wdp,action)
+            end
+            if action.save
+                eos=findfirst(c->c==UInt8('\0'),display.filename_buffer)
+                fn=join(Char.(display.filename_buffer[1:(eos-1)]))
+                save_current_world_state(ws,fn)
+                action.save=false
+            end
+            if action.load
+                eos=findfirst(c->c==UInt8('\0'),display.filename_buffer)
+                fn=join(Char.(display.filename_buffer[1:(eos-1)]))
+                load_world_state!(ws,fn)
+                action.load=false
             end
         end
     catch e
@@ -116,6 +139,16 @@ end
 
 function clean()
     World.clean(display)
+end
+
+function save_current_world_state(ws,file="ws.serialize")
+    serialize(file,ws)
+end
+
+function load_world_state!(ws,file="ws.serialize")
+    ws2=deserialize(file)
+    World.State(ws,ws2)
+    World.draw_all(ws.display[1],ws)
 end
 
 end # module

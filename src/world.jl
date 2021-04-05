@@ -36,8 +36,8 @@ end
 
 struct DerivedParameters
     possible_coordinates::PossibleCoordinates
-    function DerivedParameters(wp::Parameters)
-        new(calc_possible_coordinates(wp.cells))
+    function DerivedParameters(wp::Vector{Parameters})
+        new(calc_possible_coordinates(wp[1].cells))
     end
 end
 
@@ -45,7 +45,6 @@ struct StateHelpers
     res_pol_positions2resource::Dict{Coordinates,Array{Resource,1}}
     res_index_positions2resource::Dict{Coordinates2dIndex,Array{Resource,1}}
     resource2expunge::Array{Resource,1}
-
     function StateHelpers()
         res_pol_positions2resource=Dict{Coordinates,Array{Resource,1}}()
         res_index_positions2resource=Dict{Coordinates2dIndex,Array{Resource,1}}()
@@ -60,23 +59,36 @@ end
 @enum StateFloatIndices currentTime=1 maxLifeTime
 @enum StateIntIndices freeEnergy=1 step maxsteps cells res_id org_ancestor_count max_generations
 struct State
-    display::Display
-    wp::Parameters
+    display::Vector{Display}
+    wp::Vector{Parameters}
     floats::Array{Float64,1}
     ints::Array{Int,1}
     resources::Array{Resource,1}
     organisms::Array{Organism,1}
     cur_max_ancestor::Array{Organism,1}
-    helper::StateHelpers
-    function State(wp::Parameters)
-        display=display_initialize()
+    helper::Vector{StateHelpers}
+    function State(wp::Vector{Parameters})
+        display=Vector{Display}(undef,1)
+        display[1]=display_initialize()
         floats=Array{Float64,1}(undef,length(instances(StateFloatIndices)))
         ints=Array{Int,1}(undef,length(instances(StateIntIndices)))
         resources=Array{Resource,1}(undef,0)
         organisms=Array{Organism,1}(undef,0)
         cur_max_ancestor=Array{Organism,1}(undef,1)
-        helper=StateHelpers()
+        helper=Vector{StateHelpers}(undef,1)
+        helper[1]=StateHelpers()
         new(display, wp, floats, ints, resources, organisms, cur_max_ancestor, helper)
+    end
+    function State(ws1::State, ws2::State)
+        copyto!(ws1.wp,ws2.wp)
+        copyto!(ws1.floats,ws2.floats)
+        copyto!(ws1.ints,ws2.ints)
+        empty!(ws1.resources)
+        append!(ws1.resources,ws2.resources)
+        empty!(ws1.organisms)
+        append!(ws1.organisms,ws2.organisms)
+        copyto!(ws1.cur_max_ancestor,ws2.cur_max_ancestor)
+        copyto!(ws1.helper,ws2.helper)
     end
 end
 
@@ -151,14 +163,14 @@ function add_single_resource(ws::State,derived_param::DerivedParameters)
     energy-=res.type.energy
     if energy>=0
         push!(ws.resources,res)
-        if haskey(ws.helper.res_pol_positions2resource,res.position)
-            push!(ws.helper.res_pol_positions2resource[res.position],res)
+        if haskey(ws.helper[1].res_pol_positions2resource,res.position)
+            push!(ws.helper[1].res_pol_positions2resource[res.position],res)
         else
-            ws.helper.res_pol_positions2resource[res.position]=[res]
+            ws.helper[1].res_pol_positions2resource[res.position]=[res]
         end
         set!(ws,res_id,id+1)
         set!(ws,freeEnergy,energy)
-        draw_resource(ws.display,res)
+        draw_resource(ws.display[1],res)
         return true
     end
     return false
@@ -173,17 +185,17 @@ function test_resources(ws::State,wdp::DerivedParameters,N)
         energy+=res.free_energy
         set!(ws,freeEnergy,energy)
         res.free_energy=0
-        push!(ws.helper.resource2expunge,res)
-        wipe_resource(ws.display,res)
+        push!(ws.helper[1].resource2expunge,res)
+        wipe_resource(ws.display[1],res)
     end
 end
 
 function expunge_resources(ws::State,img_width::Int,img_height::Int)
-    for res in ws.helper.resource2expunge
+    for res in ws.helper[1].resource2expunge
         #res_pol_positions2resource::Dict{Coordinates,Array{Resource,1}}
         p=res.position
-        if haskey(ws.helper.res_pol_positions2resource,p)
-            resources=ws.helper.res_pol_positions2resource[p]
+        if haskey(ws.helper[1].res_pol_positions2resource,p)
+            resources=ws.helper[1].res_pol_positions2resource[p]
             index1=length(resources)
             depleted=zeros(Int,index1)
             index2=1
@@ -203,8 +215,8 @@ function expunge_resources(ws::State,img_width::Int,img_height::Int)
         end
         #res_index_positions2resource::Dict{Coordinates2dIndex,Array{Resource,1}}
         pos2d_index=polar_to_2d_index(p,img_width,img_height)
-        if haskey(ws.helper.res_index_positions2resource,pos2d_index)
-            resources=ws.helper.res_index_positions2resource[pos2d_index]
+        if haskey(ws.helper[1].res_index_positions2resource,pos2d_index)
+            resources=ws.helper[1].res_index_positions2resource[pos2d_index]
             index1=length(resources)
             depleted=zeros(Int,index1)
             index2=1
@@ -240,20 +252,20 @@ function expunge_resources(ws::State,img_width::Int,img_height::Int)
             end
         end
     end
-    empty!(ws.helper.resource2expunge)
+    empty!(ws.helper[1].resource2expunge)
 end
 
 function add_single_organism(ws::State,derived_param::DerivedParameters)
     energy=get(ws,freeEnergy)
     cur_time=get(ws,currentTime)
     ancestor_count=get(ws,org_ancestor_count)
-    org = Organism(derived_param.possible_coordinates,cur_time,ws.wp.org_max_energie)
+    org = Organism(derived_param.possible_coordinates,cur_time,ws.wp[1].org_max_energie)
     energy-=org.energy
     if energy>=0
         push!(ws.organisms,org)
         set!(ws,freeEnergy,energy)
         set!(ws,org_ancestor_count,ancestor_count+1)
-        draw_org(ws.display,org)
+        draw_org(ws.display[1],org)
         return true
     end
     return false
@@ -265,13 +277,13 @@ function split_organisms(ws::State,derived_param::DerivedParameters)
         if org.energy>1
             life_time=get(ws,currentTime)-org.birth_time
             split=org.trigger_split_function(life_time,org.trigger_split_expression_parameter)
-            if split > ws.wp.split_boundaries[1] && split < ws.wp.split_boundaries[2]
+            if split > ws.wp[1].split_boundaries[1] && split < ws.wp[1].split_boundaries[2]
                 split_organism!(org,ws,derived_param,siblings)
             end
         end
     end
     for org in siblings
-        draw_org(ws.display,org)
+        draw_org(ws.display[1],org)
         push!(ws.organisms,org)
     end
 end
@@ -304,9 +316,9 @@ end
 function digest_external_energy_org(ws::State)
     res2wipe=Dict{Resource,Bool}()
     for organism in ws.organisms
-        if haskey(ws.helper.res_pol_positions2resource,organism.current_position)
+        if haskey(ws.helper[1].res_pol_positions2resource,organism.current_position)
             external_energy=0
-            for res in ws.helper.res_pol_positions2resource[organism.current_position]
+            for res in ws.helper[1].res_pol_positions2resource[organism.current_position]
                 external_energy+=res.free_energy
             end
             if external_energy>0
@@ -319,7 +331,7 @@ function digest_external_energy_org(ws::State)
                 end
                 organism.energy+=new_energy
                 while new_energy>0
-                    for res in ws.helper.res_pol_positions2resource[organism.current_position]
+                    for res in ws.helper[1].res_pol_positions2resource[organism.current_position]
                         if res.free_energy>0
                             if res.free_energy>=new_energy
                                 res.free_energy-=new_energy
@@ -341,8 +353,8 @@ function digest_external_energy_org(ws::State)
         end
     end
     for res in keys(res2wipe)
-        wipe_resource(ws.display,res)
-        push!(ws.helper.resource2expunge,res)
+        wipe_resource(ws.display[1],res)
+        push!(ws.helper[1].resource2expunge,res)
     end
 end
 
@@ -385,7 +397,7 @@ function housekeeping_organisms(ws::State)
             organism.energy=new_energy
         end
         if organism.energy==0
-            wipe_org(ws.display,organism)
+            wipe_org(ws.display[1],organism)
         end
     end
 end
@@ -402,9 +414,9 @@ function move_organisms(ws::State,wdp::DerivedParameters)
             end
             organism.target_position = new_target_position
             if organism.current_position!=organism.target_position
-                wipe_org(ws.display,organism)
+                wipe_org(ws.display[1],organism)
                 organism.current_position = organism.target_position
-                draw_org(ws.display,organism)
+                draw_org(ws.display[1],organism)
             end
         end
     end
