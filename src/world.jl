@@ -56,7 +56,7 @@ struct StateHelpers
     end
 end
 
-@enum StateFloatIndices currentTime=1 maxLifeTime
+@enum StateFloatIndices currentTime=1 maxLifeTime randomizeDelta
 @enum StateIntIndices freeEnergy=1 step maxsteps cells res_id org_ancestor_count max_generations
 struct State
     display::Vector{Display}
@@ -134,6 +134,7 @@ end
 function init!(param::Parameters,derived_param::DerivedParameters,ws::State)
     set!(ws,currentTime,param.time)
     set!(ws,maxLifeTime,0.0)
+    set!(ws,randomizeDelta,0.0)
     set!(ws,freeEnergy,param.energy)
     set!(ws,cells,param.cells)
     set!(ws,step,0)
@@ -276,9 +277,19 @@ function split_organisms(ws::State,derived_param::DerivedParameters)
     for org in ws.organisms
         if org.energy>1
             life_time=get(ws,currentTime)-org.birth_time
-            split=org.trigger_split_function(life_time,org.trigger_split_expression_parameter)
-            if split > ws.wp[1].split_boundaries[1] && split < ws.wp[1].split_boundaries[2]
-                split_organism!(org,ws,derived_param,siblings)
+            split=0
+            split_ok=true
+            try
+                split=org.trigger_split_function(life_time,org.trigger_split_expression_parameter)
+            catch
+                split_ok=false
+            end
+            if split_ok
+                if split > ws.wp[1].split_boundaries[1] && split < ws.wp[1].split_boundaries[2]
+                    split_organism!(org,ws,derived_param,siblings)
+                end
+            else
+                org.energy=0
             end
         end
     end
@@ -300,7 +311,7 @@ function split_organism!(org::Organism,ws::State,derived_param::DerivedParameter
         end
         org.energy=new_energy1
         cur_time=get(ws,currentTime)
-        sibling=Organism(org, true)
+        sibling=Organism(org, true, get(ws,randomizeDelta) )
         sibling.energy=new_energy2
         sibling.is_sibling=true
         sibling.generation=org.generation+1
@@ -322,32 +333,42 @@ function digest_external_energy_org(ws::State)
                 external_energy+=res.free_energy
             end
             if external_energy>0
-                new_energy=floor(Int,organism.energy_function(external_energy,organism.energy_expression_parameter))
-                if new_energy>external_energy
-                    new_energy=external_energy
+                new_energy=0
+                new_energy_ok=true
+                try
+                    new_energy=floor(Int,organism.energy_function(external_energy,organism.energy_expression_parameter))
+                catch
+                    new_energy_ok=false
                 end
-                if new_energy<0
-                    new_energy=0
-                end
-                organism.energy+=new_energy
-                while new_energy>0
-                    for res in ws.helper[1].res_pol_positions2resource[organism.current_position]
-                        if res.free_energy>0
-                            if res.free_energy>=new_energy
-                                res.free_energy-=new_energy
-                                new_energy=0
-                            else
-                                new_energy-=res.free_energy
-                                res.free_energy=0
+                if new_energy_ok
+                    if new_energy>external_energy
+                        new_energy=external_energy
+                    end
+                    if new_energy<0
+                        new_energy=0
+                    end
+                    organism.energy+=new_energy
+                    while new_energy>0
+                        for res in ws.helper[1].res_pol_positions2resource[organism.current_position]
+                            if res.free_energy>0
+                                if res.free_energy>=new_energy
+                                    res.free_energy-=new_energy
+                                    new_energy=0
+                                else
+                                    new_energy-=res.free_energy
+                                    res.free_energy=0
+                                end
+                            end
+                            if res.free_energy==0
+                                res2wipe[res]=true
+                            end
+                            if new_energy==0
+                                break
                             end
                         end
-                        if res.free_energy==0
-                            res2wipe[res]=true
-                        end
-                        if new_energy==0
-                            break
-                        end
                     end
+                else
+                    organism.energy=0
                 end
             end
         end
@@ -384,17 +405,27 @@ end
 function housekeeping_organisms(ws::State)
     for organism in ws.organisms
         if organism.energy>0
-            new_energy=floor(Int,organism.housekeeping_function(organism.energy,organism.housekeeping_expression_parameter))
-            if new_energy>=organism.energy
-                new_energy=rand(1:organism.energy)-1
+            new_energy=0
+            new_energy_ok=true
+            try
+                new_energy=floor(Int,organism.housekeeping_function(organism.energy,organism.housekeeping_expression_parameter))
+            catch
+                new_energy_ok=false
             end
-            if new_energy<0
-                new_energy=0
+            if new_energy_ok
+                if new_energy>=organism.energy
+                    new_energy=rand(1:organism.energy)-1
+                end
+                if new_energy<0
+                    new_energy=0
+                end
+                world_energy=get(ws,freeEnergy)
+                world_energy+=(organism.energy-new_energy)
+                set!(ws,freeEnergy,world_energy)
+                organism.energy=new_energy
+            else
+                organism.energy=0
             end
-            world_energy=get(ws,freeEnergy)
-            world_energy+=(organism.energy-new_energy)
-            set!(ws,freeEnergy,world_energy)
-            organism.energy=new_energy
         end
         if organism.energy==0
             wipe_org(ws.display[1],organism)
@@ -405,18 +436,29 @@ end
 function move_organisms(ws::State,wdp::DerivedParameters)
     for organism in ws.organisms
         if organism.energy>0
-            new_ϕ = organism.ϕ_function(organism.current_position.ϕ,organism.ϕ_expression_parameter)
-            new_θ = organism.θ_function(organism.current_position.θ,organism.θ_expression_parameter)
-            organism.target_position = Coordinates(new_ϕ,new_θ)
-            new_target_position = align_to_possible_coordinates(organism.target_position,wdp.possible_coordinates)
-            if new_target_position.ϕ<0.0 || new_target_position.θ<0.0
-                println(organism.target_position," => ",new_target_position)
+            move=true
+            new_ϕ=0
+            new_θ=0
+            try
+                new_ϕ = organism.ϕ_function(organism.current_position.ϕ,organism.ϕ_expression_parameter)
+                new_θ = organism.θ_function(organism.current_position.θ,organism.θ_expression_parameter)
+            catch
+                move=false
             end
-            organism.target_position = new_target_position
-            if organism.current_position!=organism.target_position
-                wipe_org(ws.display[1],organism)
-                organism.current_position = organism.target_position
-                draw_org(ws.display[1],organism)
+            if move
+                organism.target_position = Coordinates(new_ϕ,new_θ)
+                new_target_position = align_to_possible_coordinates(organism.target_position,wdp.possible_coordinates)
+                if new_target_position.ϕ<0.0 || new_target_position.θ<0.0
+                    println(organism.target_position," => ",new_target_position)
+                end
+                organism.target_position = new_target_position
+                if organism.current_position!=organism.target_position
+                    wipe_org(ws.display[1],organism)
+                    organism.current_position = organism.target_position
+                    draw_org(ws.display[1],organism)
+                end
+            else #remove organism
+                organism.energy=0 
             end
         end
     end

@@ -9,8 +9,7 @@ include("expression.jl")
 #using .Coordinatesm
 
 let next_id::Int64 = 1
-    function randomize!(params::Array{Float64,1})
-        delta=0.1  #10%
+    function randomize!(params::Array{Float64,1},delta=0.0)
         for index in eachindex(params)
             params[index] = params[index] * rand( (1-delta):0.01:(1+delta))
         end
@@ -248,7 +247,7 @@ let next_id::Int64 = 1
                 current_position
             )
         end
-        function Organism(org, randomize = false)
+        function Organism(org, randomize = false, delta = 0.0)
             id=next_id
             next_id+=1
             trigger_split_expression_parameter=deepcopy(org.trigger_split_expression_parameter)
@@ -257,11 +256,11 @@ let next_id::Int64 = 1
             ϕ_expression_parameter=deepcopy(org.ϕ_expression_parameter)
             θ_expression_parameter=deepcopy(org.θ_expression_parameter)
             if randomize
-                randomize!(trigger_split_expression_parameter)
-                randomize!(housekeeping_expression_parameter)
-                randomize!(energy_expression_parameter)
-                randomize!(ϕ_expression_parameter)
-                randomize!(θ_expression_parameter)
+                randomize!(trigger_split_expression_parameter,delta)
+                randomize!(housekeeping_expression_parameter,delta)
+                randomize!(energy_expression_parameter,delta)
+                randomize!(ϕ_expression_parameter,delta)
+                randomize!(θ_expression_parameter,delta)
             end
             new(id,
                 org.energy,org.birth_time,

@@ -79,6 +79,7 @@ mutable struct Display
     y_res::CircularBuffer{Int}
     filename_buffer::Vector{UInt8}
     showLoad::Bool
+    runTime::Float64
 end
 
 mutable struct Action
@@ -156,7 +157,8 @@ function display_initialize()
     filename_buffer[length(default_filename)+1]=UInt8('\0')
     return Display(true,window,ctx,ctxp,ranges,builder,font_config,img_width,img_height,image_id,world_image,image_cache,
         x_values,y_org,y_res,
-        filename_buffer,true
+        filename_buffer,true,
+        0
     )
 end
 
@@ -183,7 +185,7 @@ function display_update(display::Display,action::Action,ws)
                 ImGui_ImplOpenGL3_NewFrame()
                 ImGui_ImplGlfw_NewFrame()
                 CImGui.NewFrame()
-                CImGui.SetNextWindowSize(CImGui.ImVec2(350.0,250.0),CImGui.ImGuiCond_Once);
+                CImGui.SetNextWindowSize(CImGui.ImVec2(350.0,270.0),CImGui.ImGuiCond_Once);
 
                 #CImGui.Begin("Special strings")
                 #CImGui.Text("ÄÜÖ π ϕ θ ♐ ☽ ")
@@ -192,8 +194,10 @@ function display_update(display::Display,action::Action,ws)
                 CImGui.Begin("Status")
 
                 CImGui.Text(@sprintf("Application average %.3f ms/frame (%.1f FPS)", 1000 / CImGui.GetIO().Framerate, CImGui.GetIO().Framerate))
+                CImGui.Text(@sprintf("Time running (s): %.3f",display.runTime))
                 CImGui.Text(@sprintf("Current time: %.20e",World.get(ws,World.currentTime)))
                 CImGui.Text(@sprintf("Current steps: %i of %i",World.get_step(ws),World.get_maxsteps(ws)))
+                CImGui.Text(@sprintf("Steps per second: %.5f", Float64(World.get_step(ws))/display.runTime ))
                 CImGui.BeginChild("Org",CImGui.ImVec2(0, CImGui.GetTextLineHeightWithSpacing() * 2) )
                 CImGui.Text(@sprintf("Ancestor count: %i",World.get(ws,org_ancestor_count)))
                 CImGui.Text(@sprintf("Max generations: %i",World.get(ws,max_generations)))
@@ -237,6 +241,13 @@ function display_update(display::Display,action::Action,ws)
 
                 CImGui.SameLine()
                 CImGui.InputText("",display.filename_buffer,length(display.filename_buffer)-1)
+                CImGui.End()
+
+                CImGui.Begin("Parameter")
+                delta=Cfloat[get(ws,randomizeDelta)]
+                #CImGui.DragFloat("Randomize delta:",pointer(delta),0.01)
+                CImGui.SliderFloat("Randomize delta:",pointer(delta),0.0,1.0)
+                set!(ws,randomizeDelta,Float64(delta[1]))
                 CImGui.End()
 
                 CImGui.Begin("Print")

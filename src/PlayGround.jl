@@ -13,11 +13,13 @@ global display
 
 #function run(display,ws::World.State,wdp::World.DerivedParameters,action=Action(false))
 function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action())
+    start_time=Base.time()
     time=World.get_time(ws)
     realtime=Dates.now()
     elapsed_realtime=0
     res_count=length(ws.resources)
     while ! action.stop && ! action.exit && ws.display[1].isOpen && World.get_step(ws) < World.get_maxsteps(ws)
+        ws.display[1].runTime = ( Base.time() - start_time )
         #println(step," - ",time)
         time=World.do_timestep!(ws)
         World.do_step!(ws)
@@ -81,6 +83,7 @@ function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action())
         end
     end
     action.stop=true
+    ws.display[1].runTime = ( Base.time() - start_time )
     ws
 end
 
