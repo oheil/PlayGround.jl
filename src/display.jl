@@ -78,8 +78,9 @@ mutable struct Display
     y_org::CircularBuffer{Int}
     y_res::CircularBuffer{Int}
     filename_buffer::Vector{UInt8}
-    showLoad::Bool
     runTime::Float64
+    showLoad::Bool
+    showReset::Bool
 end
 
 mutable struct Action
@@ -87,11 +88,12 @@ mutable struct Action
     exit::Bool
     save::Bool
     load::Bool
+    reset::Bool
     function Action()
-        new(false,false,false,false)
+        new(false,false,false,false,false)
     end
     function Action(stop::Bool)
-        new(stop,false,false,false)
+        new(stop,false,false,false,false)
     end
 end
 
@@ -157,8 +159,9 @@ function display_initialize()
     filename_buffer[length(default_filename)+1]=UInt8('\0')
     return Display(true,window,ctx,ctxp,ranges,builder,font_config,img_width,img_height,image_id,world_image,image_cache,
         x_values,y_org,y_res,
-        filename_buffer,true,
-        0
+        filename_buffer,
+        0,
+        true,true
     )
 end
 
@@ -233,6 +236,10 @@ function display_update(display::Display,action::Action,ws)
                 end
                 CImGui.SameLine()
                 CImGui.Button("Exit") && (action.exit = true)
+                if display.showReset
+                    CImGui.SameLine()
+                    CImGui.Button("Reset") && (action.reset = true)
+                end
                 CImGui.Button("Save") && (action.save = true)
                 if display.showLoad
                     CImGui.SameLine()
@@ -524,7 +531,20 @@ function draw_org(display::Display,org::World.Organism)
     end
 end
 
+function wipe_all(display::Display,ws)
+    colorDel=[0,0,0,255]
+    for xindex in 1:1:display.img_width
+        for yindex in 1:1:display.img_height
+            display.image_cache[xindex,yindex] = 0
+            for rgb in 1:4
+                display.world_image[rgb,xindex,yindex]=colorDel[rgb]
+            end
+        end
+    end
+end
+
 function draw_all(display::Display,ws)
+    wipe_all(display,ws)
     for res in ws.resources
         #draw_resource(display,ws,res)
         draw_resource(display,res)

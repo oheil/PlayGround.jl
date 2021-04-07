@@ -65,6 +65,7 @@ function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action())
             elapsed_realtime=0
             #display=display_update(display,ws,action)
             ws.display[1].showLoad=false
+            ws.display[1].showReset=false
             global display=World.display_update(ws.display[1],action,ws)
         #end
 
@@ -107,6 +108,7 @@ function run(max_steps::Int=typemax(Int),ws=nothing,wdp=nothing)
             sleep(0.007)
             #display=display_update(display,ws,action)
             ws.display[1].showLoad=true
+            ws.display[1].showReset=true
             global display=World.display_update(ws.display[1],action,ws)
             #World.expunge_organisms(ws)
             if ! action.stop
@@ -125,6 +127,10 @@ function run(max_steps::Int=typemax(Int),ws=nothing,wdp=nothing)
                 fn=join(Char.(display.filename_buffer[1:(eos-1)]))
                 load_world_state!(ws,fn)
                 action.load=false
+            end
+            if action.reset
+                reset_world_state!(wp,wdp,ws)
+                action.reset=false
             end
         end
     catch e
@@ -151,6 +157,11 @@ end
 function load_world_state!(ws,file="ws.serialize")
     ws2=deserialize(file)
     World.State(ws,ws2)
+    World.draw_all(ws.display[1],ws)
+end
+
+function reset_world_state!(wp,wdp,ws)
+    World.init!(wp[1],wdp,ws)
     World.draw_all(ws.display[1],ws)
 end
 

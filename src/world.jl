@@ -132,6 +132,9 @@ function clean(display)
 end
 
 function init!(param::Parameters,derived_param::DerivedParameters,ws::State)
+    empty!(ws.resources)
+    empty!(ws.organisms)
+    ws.helper[1]=StateHelpers()
     set!(ws,currentTime,param.time)
     set!(ws,maxLifeTime,0.0)
     set!(ws,randomizeDelta,0.0)
