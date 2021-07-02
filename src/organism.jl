@@ -247,6 +247,7 @@ let next_id::Int64 = 1
                 current_position
             )
         end
+        
         function Organism(org, randomize = false, delta = 0.0)
             id=next_id
             next_id+=1
