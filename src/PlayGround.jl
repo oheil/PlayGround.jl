@@ -31,7 +31,7 @@ function run(ws::World.State,wdp::World.DerivedParameters,action=World.Action())
         #        break
         #    end
         #end
-
+        
         World.digest_external_energy_org(ws)
         World.housekeeping_organisms(ws)
         World.move_organisms(ws,wdp)
